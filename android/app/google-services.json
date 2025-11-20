@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "276979364524",
+    "project_id": "smartapp-608d4",
+    "storage_bucket": "smartapp-608d4.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:276979364524:android:4790a34f79744a76ef6509",
+        "android_client_info": {
+          "package_name": "KHAIRAT_Mouhcine.smater_app_ai"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBc25wVnzO_teb4sR62-1XX8sYA7ck_QzU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
