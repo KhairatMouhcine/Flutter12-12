@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 class HomePage extends StatefulWidget {
@@ -83,9 +84,10 @@ class _HomePageState extends State<HomePage> {
             ListTile(
               leading: const Icon(Icons.logout),
               title: const Text('Logout'),
-              onTap: () {
-                // Handle logout action
-                Navigator.pop(context);
+              onTap: () async {
+                Navigator.pop(context); // Fermer le drawer
+                await FirebaseAuth.instance.signOut(); // Déconnexion
+                // Le StreamBuilder redirigera automatiquement vers LoginPage
               },
             ),
           ],
