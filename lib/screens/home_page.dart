@@ -60,7 +60,7 @@ class _HomePageState extends State<HomePage> {
               title: const Text('Emsi CHATBOT'),
               onTap: () {
                 // Navigate to Home Page
-                Navigator.pop(context);
+                Navigator.pushNamed(context, "/chatbot");
               },
             ),
             Divider(color: Colors.grey),
