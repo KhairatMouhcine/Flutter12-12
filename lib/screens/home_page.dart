@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
-
   @override
   State<HomePage> createState() => _HomePageState();
 }
@@ -36,7 +35,6 @@ class _HomePageState extends State<HomePage> {
                     'KHAIRAT MOUHCINE',
                     style: TextStyle(
                       color: Colors.white,
-
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -51,7 +49,6 @@ class _HomePageState extends State<HomePage> {
               leading: const Icon(Icons.home),
               title: const Text('Fruit Clasifier'),
               onTap: () {
-                // Navigate to Home Page
                 Navigator.pushNamed(context, "/fruitClasifier");
               },
             ),
@@ -59,8 +56,14 @@ class _HomePageState extends State<HomePage> {
               leading: const Icon(Icons.home),
               title: const Text('Emsi CHATBOT'),
               onTap: () {
-                // Navigate to Home Page
                 Navigator.pushNamed(context, "/chatbot");
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.home),
+              title: const Text('Meteo'),
+              onTap: () {
+                Navigator.pushNamed(context, "/meteo");
               },
             ),
             Divider(color: Colors.grey),
@@ -68,8 +71,14 @@ class _HomePageState extends State<HomePage> {
               leading: const Icon(Icons.account_circle),
               title: const Text('Profile'),
               onTap: () {
-                // Navigate to Profile Page
                 Navigator.pop(context);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.account_circle),
+              title: const Text('call video'),
+              onTap: () {
+                Navigator.pushNamed(context, "/callVideo");
               },
             ),
             ListTile(
@@ -77,7 +86,6 @@ class _HomePageState extends State<HomePage> {
               trailing: const Icon(Icons.arrow_forward),
               title: const Text('Settings'),
               onTap: () {
-                // Navigate to Settings Page
                 Navigator.pop(context);
               },
             ),
@@ -85,8 +93,8 @@ class _HomePageState extends State<HomePage> {
               leading: const Icon(Icons.logout),
               title: const Text('Logout'),
               onTap: () async {
-                Navigator.pop(context); // Fermer le drawer
-                await FirebaseAuth.instance.signOut(); // Déconnexion
+                Navigator.pop(context);
+                await FirebaseAuth.instance.signOut();
                 // Le StreamBuilder redirigera automatiquement vers LoginPage
               },
             ),

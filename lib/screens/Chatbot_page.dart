@@ -16,7 +16,8 @@ class _ChatbotPageState extends State<ChatbotPage> {
   bool _isLoading = false;
 
   // URL de votre serveur Ollama local
-  final String _ollamaUrl = 'http://192.168.0.194:11434/api/generate';
+  final String _ollamaUrl = 'http://10.0.2.2:11434/api/generate';
+
   @override
   void initState() {
     super.initState();

@@ -3,9 +3,6 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import 'package:speech_to_text/speech_to_text.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
-import 'package:path_provider/path_provider.dart';
 import 'dart:async';
 
 class VideoCallScreen extends StatefulWidget {
@@ -31,21 +28,9 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   // Call timer
   int _callDuration = 0;
   Timer? _callTimer;
+  int _thinkingDuration = 0;
 
   final Random _random = Random();
-
-  // API configurations
-  final String ollamaUrl =
-      'http://192.168.0.198:11434/api/generate'; // Pour émulateur Android
-  // final String ollamaUrl = 'http://localhost:11434/api/generate'; // Pour iOS simulator
-  final String dIdApiKey =
-      'bm92YXRyaXhub3ZhQGdtYWlsLmNvbQ:C2A8tfRpXD540J3e8UezA';
-  final String dIdTalksUrl = 'https://api.d-id.com/talks';
-  final String imageS3Url =
-      's3://d-id-images-prod/google-oauth2|110635467151005719516/img_ACZTTgfnOoYya7PVE-F5C/1732555405028.jpg';
-
-  String? _currentGeneratedVideoPath;
-  String? _currentTalkId;
 
   @override
   void initState() {
@@ -90,22 +75,14 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     _currentVideoController?.dispose();
     _currentVideoController = null;
 
-    // Delete current generated video if exists
-    if (_currentGeneratedVideoPath != null) {
-      File(_currentGeneratedVideoPath!).delete().catchError((e) {
-        print('Error deleting video: $e');
-      });
-    }
-
     if (mounted) {
       setState(() {
         _isCallActive = false;
         _callState = CallState.idle;
         _callDuration = 0;
+        _thinkingDuration = 0;
         _isListening = false;
         _userText = '';
-        _currentGeneratedVideoPath = null;
-        _currentTalkId = null;
       });
     }
   }
@@ -135,10 +112,9 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     }
   }
 
-  // Step 2: Show listening video and capture speech - listen until user finishes
-  // Step 2: SIMULATION POUR TESTER SANS MICRO
+  // Step 2: Show listening video and capture speech
   Future<void> _startListening() async {
-    if (!_isCallActive) return;
+    if (!_isCallActive) return; // Don't start if call ended
 
     setState(() {
       _callState = CallState.listening;
@@ -147,15 +123,25 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
 
     await _playVideo('assets/videos/listening.mp4', loop: true);
 
-    // SIMULATION - Attends 3 secondes puis simule une question
-    await Future.delayed(const Duration(seconds: 3));
+    // Start speech recognition
+    _speechToText.listen(
+      onResult: (result) {
+        if (mounted) {
+          setState(() {
+            _userText = result.recognizedWords;
+          });
+        }
+      },
+    );
 
-    setState(() {
-      _userText = "Quelle est la capitale de la France ?";
-    });
+    setState(() => _isListening = true);
 
-    await Future.delayed(const Duration(seconds: 1));
-    _stopListening();
+    // After 10 seconds, stop listening and show thinking
+    await Future.delayed(const Duration(seconds: 10));
+
+    if (_isCallActive) {
+      _stopListening();
+    }
   }
 
   Future<void> _stopListening() async {
@@ -164,241 +150,72 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
       setState(() => _isListening = false);
     }
 
-    // Process user text with Ollama if not empty
-    if (_userText.isNotEmpty) {
-      await _processWithOllama(_userText);
-    } else {
-      // If no text, restart listening
-      _startListening();
-    }
-  }
-
-  // Step 3: Send to Ollama and get response
-  Future<void> _processWithOllama(String userInput) async {
-    if (!_isCallActive) return;
-
-    print('User said: $userInput');
-
-    // Show thinking video immediately
+    // Show thinking video
     _showThinking();
-
-    try {
-      final response = await http.post(
-        Uri.parse(ollamaUrl),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'model': 'llama3.2:latest',
-          'prompt':
-              '$userInput. Réponds en maximum 2-3 phrases courtes.', // Force short response
-          'stream': false,
-        }),
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final aiResponse = data['response'];
-
-        print('Ollama response: $aiResponse');
-
-        if (_isCallActive) {
-          // Send to D-ID to generate video (thinking continues)
-          await _generateVideoWithDID(aiResponse);
-        }
-      } else {
-        print('Ollama error: ${response.statusCode}');
-        // Restart listening on error
-        if (_isCallActive) _startListening();
-      }
-    } catch (e) {
-      print('Error calling Ollama: $e');
-      // Restart listening on error
-      if (_isCallActive) _startListening();
-    }
   }
 
-  // Step 4: Show random thinking video (keeps looping until response ready)
+  // Step 3: Show random thinking video (1-10 seconds)
   Future<void> _showThinking() async {
-    if (!_isCallActive) return;
+    if (!_isCallActive) return; // Don't continue if call ended
 
     setState(() => _callState = CallState.thinking);
+
+    // Random thinking duration between 1-10 seconds
+    final thinkingSeconds = _random.nextInt(10) + 1;
+    setState(() => _thinkingDuration = thinkingSeconds);
 
     // Random thinking video (1, 2, or 3)
     final thinkingVideoNumber = _random.nextInt(3) + 1;
     final thinkingVideo = 'assets/videos/thinking$thinkingVideoNumber.mp4';
 
-    // Loop thinking video indefinitely until response is ready
     await _playVideo(thinkingVideo, loop: true);
-  }
 
-  // Step 5: Generate video with D-ID
-  Future<void> _generateVideoWithDID(String responseText) async {
-    if (!_isCallActive) return;
+    // Wait for random duration
+    await Future.delayed(Duration(seconds: thinkingSeconds));
 
-    try {
-      print('Creating D-ID talk...');
-
-      // Create talk with D-ID
-      final createResponse = await http.post(
-        Uri.parse(dIdTalksUrl),
-        headers: {
-          'Authorization': 'Basic $dIdApiKey',
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
-          'source_url': imageS3Url,
-          'script': {'type': 'text', 'input': responseText},
-        }),
-      );
-
-      if (createResponse.statusCode == 201) {
-        final talkData = jsonDecode(createResponse.body);
-        _currentTalkId = talkData['id'];
-
-        print('Talk created: $_currentTalkId');
-
-        // Keep showing thinking video and poll for completion
-        await _pollForVideoCompletion(_currentTalkId!);
-      } else {
-        print('D-ID create error: ${createResponse.statusCode}');
-        if (_isCallActive) _startListening();
-      }
-    } catch (e) {
-      print('Error generating video with D-ID: $e');
-      if (_isCallActive) _startListening();
+    if (_isCallActive) {
+      // Show response
+      _showResponse();
     }
   }
 
-  // Step 6: Poll D-ID until video is ready (thinking continues)
-  Future<void> _pollForVideoCompletion(String talkId) async {
-    const maxAttempts = 60; // 5 minutes max
-    int attempts = 0;
+  // Step 4: Show response video
+  Future<void> _showResponse() async {
+    if (!_isCallActive) return; // Don't continue if call ended
 
-    while (attempts < maxAttempts && _isCallActive) {
-      await Future.delayed(const Duration(seconds: 5));
+    setState(() {
+      _callState = CallState.responding;
+      _thinkingDuration = 0;
+    });
 
-      try {
-        final statusResponse = await http.get(
-          Uri.parse('$dIdTalksUrl/$talkId'),
-          headers: {'Authorization': 'Basic $dIdApiKey'},
-        );
+    await _playVideo('assets/videos/reponse.mp4');
 
-        if (statusResponse.statusCode == 200) {
-          final statusData = jsonDecode(statusResponse.body);
-          final status = statusData['status'];
-
-          print('D-ID status: $status');
-
-          if (status == 'done') {
-            final resultUrl = statusData['result_url'];
-            await _downloadAndPlayResponse(resultUrl, talkId);
-            break;
-          } else if (status == 'error') {
-            print('D-ID video generation failed');
-            if (_isCallActive) _startListening();
-            break;
-          }
-          // If status is 'created' or 'started', keep thinking video playing
-        }
-      } catch (e) {
-        print('Error polling D-ID: $e');
-      }
-
-      attempts++;
-    }
-
-    if (attempts >= maxAttempts) {
-      print('Timeout waiting for D-ID video');
-      if (_isCallActive) _startListening();
-    }
+    // When response video finishes, restart listening
+    _currentVideoController?.addListener(_onResponseVideoComplete);
   }
 
-  // Step 7: Download generated video and play it
-  Future<void> _downloadAndPlayResponse(String videoUrl, String talkId) async {
-    if (!_isCallActive) return;
-
-    try {
-      print('Downloading video...');
-
-      setState(() => _callState = CallState.responding);
-
-      // Download video
-      final response = await http.get(Uri.parse(videoUrl));
-
-      if (response.statusCode == 200) {
-        // Save to app documents directory
-        final directory = await getApplicationDocumentsDirectory();
-        final generationDir = Directory('${directory.path}/generation');
-
-        if (!await generationDir.exists()) {
-          await generationDir.create(recursive: true);
-        }
-
-        final videoPath = '${generationDir.path}/$talkId.mp4';
-        final file = File(videoPath);
-        await file.writeAsBytes(response.bodyBytes);
-
-        _currentGeneratedVideoPath = videoPath;
-
-        print('Video saved: $videoPath');
-
-        // Play the response video
-        await _playVideo(videoPath, isFile: true);
-
-        // When video finishes, delete it and restart listening
-        _currentVideoController?.addListener(_onResponseVideoComplete);
-      }
-    } catch (e) {
-      print('Error downloading video: $e');
-      if (_isCallActive) _startListening();
-    }
-  }
-
-  // Step 8: Delete video after playing and restart listening
   void _onResponseVideoComplete() {
     if (_currentVideoController != null &&
         _currentVideoController!.value.position >=
             _currentVideoController!.value.duration) {
       _currentVideoController?.removeListener(_onResponseVideoComplete);
 
-      // Delete the generated video
-      if (_currentGeneratedVideoPath != null && _isCallActive) {
-        File(_currentGeneratedVideoPath!)
-            .delete()
-            .then((_) {
-              print('Generated video deleted');
-              _currentGeneratedVideoPath = null;
-              _currentTalkId = null;
-
-              // Restart listening for next question
-              if (_isCallActive) {
-                _startListening();
-              }
-            })
-            .catchError((e) {
-              print('Error deleting video: $e');
-              if (_isCallActive) _startListening();
-            });
+      if (_isCallActive) {
+        // Restart listening cycle
+        _startListening();
       }
     }
   }
 
-  // Helper: Play video from asset or file
-  Future<void> _playVideo(
-    String path, {
-    bool loop = false,
-    bool isFile = false,
-  }) async {
-    if (!_isCallActive) return;
+  // Helper: Play video from asset
+  Future<void> _playVideo(String path, {bool loop = false}) async {
+    if (!_isCallActive) return; // Don't play if call ended
 
     // Dispose previous controller
     await _currentVideoController?.dispose();
 
     // Create new controller
-    if (isFile) {
-      _currentVideoController = VideoPlayerController.file(File(path));
-    } else {
-      _currentVideoController = VideoPlayerController.asset(path);
-    }
+    _currentVideoController = VideoPlayerController.asset(path);
 
     await _currentVideoController!.initialize();
 
@@ -527,18 +344,18 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                           color: Colors.orange.withOpacity(0.8),
                           borderRadius: BorderRadius.circular(20),
                         ),
-                        child: const Row(
+                        child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(
+                            const Icon(
                               Icons.psychology,
                               color: Colors.white,
                               size: 16,
                             ),
-                            SizedBox(width: 8),
+                            const SizedBox(width: 8),
                             Text(
-                              'Thinking...',
-                              style: TextStyle(
+                              'Thinking... (${_thinkingDuration}s)',
+                              style: const TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -590,4 +407,3 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
 }
 
 enum CallState { idle, welcome, listening, thinking, responding }
-

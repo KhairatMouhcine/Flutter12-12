@@ -138,7 +138,7 @@ class _RegisterPageState extends State<RegisterPage> {
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Center(child: Image.asset('assets/images/logo.jpg', height: 100)),
+              Center(child: Image.asset('assets/images/logo.png', height: 100)),
               const SizedBox(height: 20),
               const SizedBox(height: 30),
               TextFormField(
