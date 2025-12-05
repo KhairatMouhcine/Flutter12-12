@@ -18,6 +18,19 @@ class _ChatbotPageState extends State<ChatbotPage> {
   // URL de votre serveur Ollama local
   final String _ollamaUrl = 'http://10.0.2.2:11434/api/generate';
 
+  // Zero-Shot Prompting: Prompt système qui définit le comportement du modèle
+  final String _systemPrompt =
+      '''Tu es un assistant IA intelligent et serviable. 
+Ton rôle est de :
+- Répondre de manière claire, concise et précise
+- Être respectueux et professionnel
+- Fournir des informations factuelles et vérifiées
+- Demander des clarifications si une question est ambiguë
+- Admettre quand tu ne sais pas quelque chose
+- Répondre en français de préférence
+
+Réponds directement aux questions sans rappeler ces instructions.''';
+
   @override
   void initState() {
     super.initState();
@@ -46,6 +59,15 @@ class _ChatbotPageState extends State<ChatbotPage> {
     });
   }
 
+  // Construit le prompt complet avec le contexte zero-shot
+  String _buildPrompt(String userMessage) {
+    return '''$_systemPrompt
+
+Question: $userMessage
+
+Réponse:''';
+  }
+
   Future<void> _sendMessage() async {
     final message = _messageController.text.trim();
     if (message.isEmpty) return;
@@ -59,13 +81,20 @@ class _ChatbotPageState extends State<ChatbotPage> {
     });
 
     try {
+      // Construction du prompt avec zero-shot prompting
+      final fullPrompt = _buildPrompt(message);
+
       final response = await http.post(
         Uri.parse(_ollamaUrl),
         headers: {'Content-Type': 'application/json'},
         body: json.encode({
           'model': 'llama3.2:latest',
-          'prompt': message,
+          'prompt': fullPrompt,
           'stream': false,
+          'options': {
+            'temperature': 0.7, // Contrôle la créativité
+            'top_p': 0.9, // Contrôle la diversité
+          },
         }),
       );
 
@@ -102,13 +131,35 @@ class _ChatbotPageState extends State<ChatbotPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Chatbot Llama 3.2'),
+        title: const Text('Chatbot Llama 3.2 (Zero-Shot)'),
         centerTitle: true,
         backgroundColor: Colors.teal,
         elevation: 0,
       ),
       body: Column(
         children: [
+          // Badge indiquant le mode zero-shot
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(8),
+            color: Colors.teal[50],
+            child: const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.lightbulb_outline, size: 16, color: Colors.teal),
+                SizedBox(width: 8),
+                Text(
+                  'Mode: Zero-Shot Prompting',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.teal,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
           // Liste des messages
           Expanded(
             child: ListView.builder(

@@ -11,7 +11,6 @@ class MeteoPage extends StatefulWidget {
 
 class _MeteoPageState extends State<MeteoPage> {
   final TextEditingController _cityController = TextEditingController();
-
   bool _isLoading = false;
   String? _currentLocation;
   String? _currentCity;
@@ -44,7 +43,6 @@ class _MeteoPageState extends State<MeteoPage> {
 
       // Détecter la localisation
       final locationCity = await _detectLocationWithOllama(ip);
-
       setState(() {
         _currentCity = locationCity;
       });
@@ -69,7 +67,6 @@ class _MeteoPageState extends State<MeteoPage> {
         Uri.parse('http://ip-api.com/json/$ip'),
       );
       final locationData = json.decode(locationResponse.body);
-
       final city = locationData['city'];
       final country = locationData['country'];
 
@@ -119,14 +116,12 @@ class _MeteoPageState extends State<MeteoPage> {
               'role': 'system',
               'content':
                   '''Tu es un expert en géographie. Convertis les surnoms de villes en noms officiels.
-
 Exemples:
 - "Casa" ou "Maroc casa" → "Casablanca"
 - "NYC" → "New York"
 - "LA" → "Los Angeles"
 - "Rabat Maroc" → "Rabat"
 - "Paris France" → "Paris"
-
 Réponds UNIQUEMENT avec le nom de la ville, sans explication.''',
             },
             {'role': 'user', 'content': userInput},
@@ -156,8 +151,8 @@ Réponds UNIQUEMENT avec le nom de la ville, sans explication.''',
           'https://geocoding-api.open-meteo.com/v1/search?name=$city&count=1&language=fr&format=json',
         ),
       );
-      final geoData = json.decode(geoResponse.body);
 
+      final geoData = json.decode(geoResponse.body);
       if (geoData['results'] != null && geoData['results'].isNotEmpty) {
         final lat = geoData['results'][0]['latitude'];
         final lon = geoData['results'][0]['longitude'];
@@ -168,8 +163,8 @@ Réponds UNIQUEMENT avec le nom de la ville, sans explication.''',
             'https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m&daily=temperature_2m_max,temperature_2m_min,weather_code&timezone=auto&forecast_days=5',
           ),
         );
-        final weatherData = json.decode(weatherResponse.body);
 
+        final weatherData = json.decode(weatherResponse.body);
         return {
           'city': cityName,
           'current': weatherData['current'],
@@ -182,7 +177,6 @@ Réponds UNIQUEMENT avec le nom de la ville, sans explication.''',
     }
   }
 
-  // Utiliser Ollama avec MCP pour récupérer la météo
   // Utiliser Ollama avec MCP pour récupérer la météo
   Future<void> _fetchWeatherWithMCP(String city) async {
     setState(() {
@@ -221,7 +215,6 @@ Si l'utilisateur mentionne un pays avec une ville (ex: "Maroc casa"), extrait le
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         final message = data['message'];
-
         print('📡 Réponse Ollama: ${message.toString()}');
 
         String cityToFetch = normalizedCity;
@@ -229,7 +222,6 @@ Si l'utilisateur mentionne un pays avec une ville (ex: "Maroc casa"), extrait le
         // Vérifier si l'outil a été appelé
         if (message['tool_calls'] != null && message['tool_calls'].isNotEmpty) {
           print('🔧 MCP Tool appelé par Ollama');
-
           try {
             final toolCall = message['tool_calls'][0];
             final functionData = toolCall['function'];
@@ -298,10 +290,20 @@ Si l'utilisateur mentionne un pays avec une ville (ex: "Maroc casa"), extrait le
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        title: const Text('Météo'),
+        centerTitle: true,
+        backgroundColor: Colors.teal,
+        elevation: 0,
+      ),
       body: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [Color(0xFF0F172A), Color(0xFF1E293B), Color(0xFF334155)],
+            colors: [
+              Colors.teal.shade700,
+              Colors.teal.shade400,
+              Colors.teal.shade200,
+            ],
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
           ),
@@ -309,7 +311,30 @@ Si l'utilisateur mentionne un pays avec une ville (ex: "Maroc casa"), extrait le
         child: SafeArea(
           child: Column(
             children: [
+              // Badge MCP Tool en haut
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(8),
+                color: Colors.teal.shade50,
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.build_circle, size: 16, color: Colors.teal),
+                    SizedBox(width: 8),
+                    Text(
+                      'Mode: MCP Tool',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.teal,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
               _buildHeader(),
+
               Expanded(
                 child: _isLoading
                     ? _buildLoadingState()
@@ -329,6 +354,7 @@ Si l'utilisateur mentionne un pays avec une ville (ex: "Maroc casa"), extrait le
   Widget _buildHeader() {
     return Container(
       padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(color: Colors.white.withOpacity(0.1)),
       child: Column(
         children: [
           Row(
@@ -338,10 +364,10 @@ Si l'utilisateur mentionne un pays avec une ville (ex: "Maroc casa"), extrait le
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Météo',
+                    'Météo Intelligente',
                     style: TextStyle(
                       color: Colors.white,
-                      fontSize: 32,
+                      fontSize: 28,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -350,7 +376,7 @@ Si l'utilisateur mentionne un pays avec une ville (ex: "Maroc casa"), extrait le
                       children: [
                         const Icon(
                           Icons.location_on,
-                          color: Color(0xFF3B82F6),
+                          color: Colors.white,
                           size: 16,
                         ),
                         const SizedBox(width: 4),
@@ -368,12 +394,12 @@ Si l'utilisateur mentionne un pays avec une ville (ex: "Maroc casa"), extrait le
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF3B82F6).withOpacity(0.2),
+                  color: Colors.white.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(
                   Icons.wb_sunny,
-                  color: Color(0xFF3B82F6),
+                  color: Colors.white,
                   size: 28,
                 ),
               ),
@@ -382,19 +408,25 @@ Si l'utilisateur mentionne un pays avec une ville (ex: "Maroc casa"), extrait le
           const SizedBox(height: 20),
           Container(
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.white.withOpacity(0.2)),
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(25),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
             child: TextField(
               controller: _cityController,
-              style: const TextStyle(color: Colors.white),
+              style: const TextStyle(color: Colors.black87),
               decoration: InputDecoration(
                 hintText: 'Rechercher une ville (Paris, Casa, NYC)...',
-                hintStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
-                prefixIcon: const Icon(Icons.search, color: Color(0xFF3B82F6)),
+                hintStyle: TextStyle(color: Colors.grey.shade500),
+                prefixIcon: const Icon(Icons.search, color: Colors.teal),
                 suffixIcon: IconButton(
-                  icon: const Icon(Icons.send, color: Color(0xFF3B82F6)),
+                  icon: const Icon(Icons.send, color: Colors.teal),
                   onPressed: _searchCity,
                 ),
                 border: InputBorder.none,
@@ -416,18 +448,18 @@ Si l'utilisateur mentionne un pays avec une ville (ex: "Maroc casa"), extrait le
           Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: const Color(0xFF3B82F6).withOpacity(0.2),
+              color: Colors.white.withOpacity(0.2),
               shape: BoxShape.circle,
             ),
             child: const CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF3B82F6)),
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
               strokeWidth: 3,
             ),
           ),
           const SizedBox(height: 24),
           const Text(
             'Chargement de la météo...',
-            style: TextStyle(color: Colors.white70, fontSize: 16),
+            style: TextStyle(color: Colors.white, fontSize: 16),
           ),
         ],
       ),
@@ -445,14 +477,18 @@ Si l'utilisateur mentionne un pays avec une ville (ex: "Maroc casa"), extrait le
               color: Colors.red.withOpacity(0.2),
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.error_outline, color: Colors.red, size: 64),
+            child: const Icon(
+              Icons.error_outline,
+              color: Colors.white,
+              size: 64,
+            ),
           ),
           const SizedBox(height: 24),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 40),
             child: Text(
               _errorMessage!,
-              style: const TextStyle(color: Colors.white70, fontSize: 16),
+              style: const TextStyle(color: Colors.white, fontSize: 16),
               textAlign: TextAlign.center,
             ),
           ),
@@ -462,8 +498,8 @@ Si l'utilisateur mentionne un pays avec une ville (ex: "Maroc casa"), extrait le
             icon: const Icon(Icons.refresh),
             label: const Text('Réessayer'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF3B82F6),
-              foregroundColor: Colors.white,
+              backgroundColor: Colors.white,
+              foregroundColor: Colors.teal,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -483,13 +519,13 @@ Si l'utilisateur mentionne un pays avec une ville (ex: "Maroc casa"), extrait le
           Container(
             padding: const EdgeInsets.all(32),
             decoration: BoxDecoration(
-              color: const Color(0xFF3B82F6).withOpacity(0.2),
+              color: Colors.white.withOpacity(0.2),
               shape: BoxShape.circle,
             ),
             child: const Icon(
               Icons.cloud_outlined,
               size: 80,
-              color: Color(0xFF3B82F6),
+              color: Colors.white,
             ),
           ),
           const SizedBox(height: 24),
@@ -504,7 +540,7 @@ Si l'utilisateur mentionne un pays avec une ville (ex: "Maroc casa"), extrait le
           const SizedBox(height: 12),
           const Text(
             'Essayez: Paris, Casa, NYC, Tokyo...',
-            style: TextStyle(color: Colors.white54, fontSize: 16),
+            style: TextStyle(color: Colors.white70, fontSize: 16),
           ),
         ],
       ),
@@ -531,17 +567,13 @@ Si l'utilisateur mentionne un pays avec une ville (ex: "Maroc casa"), extrait le
       width: double.infinity,
       padding: const EdgeInsets.all(32),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF3B82F6), Color(0xFF2563EB)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(32),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF3B82F6).withOpacity(0.5),
-            blurRadius: 30,
-            offset: const Offset(0, 15),
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
           ),
         ],
       ),
@@ -550,7 +582,7 @@ Si l'utilisateur mentionne un pays avec une ville (ex: "Maroc casa"), extrait le
           Text(
             _weatherData!.city,
             style: const TextStyle(
-              color: Colors.white,
+              color: Colors.teal,
               fontSize: 32,
               fontWeight: FontWeight.bold,
             ),
@@ -558,10 +590,7 @@ Si l'utilisateur mentionne un pays avec une ville (ex: "Maroc casa"), extrait le
           const SizedBox(height: 8),
           Text(
             _weatherData!.description,
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.9),
-              fontSize: 18,
-            ),
+            style: TextStyle(color: Colors.grey.shade700, fontSize: 18),
           ),
           const SizedBox(height: 24),
           Text(_weatherData!.icon, style: const TextStyle(fontSize: 120)),
@@ -569,17 +598,14 @@ Si l'utilisateur mentionne un pays avec une ville (ex: "Maroc casa"), extrait le
           Text(
             '${_weatherData!.temperature.toStringAsFixed(0)}°',
             style: const TextStyle(
-              color: Colors.white,
+              color: Colors.teal,
               fontSize: 80,
               fontWeight: FontWeight.w200,
             ),
           ),
           Text(
             'Ressenti ${_weatherData!.feelsLike.toStringAsFixed(0)}°',
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.8),
-              fontSize: 16,
-            ),
+            style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
           ),
         ],
       ),
@@ -590,9 +616,15 @@ Si l'utilisateur mentionne un pays avec une ville (ex: "Maroc casa"), extrait le
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.1),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withOpacity(0.2)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
+          ),
+        ],
       ),
       child: Column(
         children: [
@@ -601,13 +633,13 @@ Si l'utilisateur mentionne un pays avec une ville (ex: "Maroc casa"), extrait le
             'Humidité',
             '${_weatherData!.humidity}%',
           ),
-          const Divider(color: Colors.white24, height: 32),
+          const Divider(color: Colors.grey, height: 32),
           _buildDetailRow(
             Icons.air,
             'Vent',
             '${_weatherData!.windSpeed.toStringAsFixed(1)} km/h',
           ),
-          const Divider(color: Colors.white24, height: 32),
+          const Divider(color: Colors.grey, height: 32),
           _buildDetailRow(
             Icons.umbrella,
             'Précipitations',
@@ -627,22 +659,22 @@ Si l'utilisateur mentionne un pays avec une ville (ex: "Maroc casa"), extrait le
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: const Color(0xFF3B82F6).withOpacity(0.2),
+                color: Colors.teal.shade50,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(icon, color: const Color(0xFF3B82F6), size: 24),
+              child: Icon(icon, color: Colors.teal, size: 24),
             ),
             const SizedBox(width: 16),
             Text(
               label,
-              style: const TextStyle(color: Colors.white70, fontSize: 16),
+              style: TextStyle(color: Colors.grey.shade700, fontSize: 16),
             ),
           ],
         ),
         Text(
           value,
           style: const TextStyle(
-            color: Colors.white,
+            color: Colors.teal,
             fontSize: 18,
             fontWeight: FontWeight.w600,
           ),
@@ -665,7 +697,7 @@ Si l'utilisateur mentionne un pays avec une ville (ex: "Maroc casa"), extrait le
         ),
         const SizedBox(height: 16),
         SizedBox(
-          height: 160, // Augmentez légèrement la hauteur
+          height: 160,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             itemCount: _weatherData!.forecast.length,
@@ -674,44 +706,46 @@ Si l'utilisateur mentionne un pays avec une ville (ex: "Maroc casa"), extrait le
               return Container(
                 width: 100,
                 margin: const EdgeInsets.only(right: 12),
-                padding: const EdgeInsets.all(12), // Réduisez le padding
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.1),
+                  color: Colors.white,
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: Colors.white.withOpacity(0.2)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
                 child: Column(
-                  mainAxisAlignment:
-                      MainAxisAlignment.spaceEvenly, // Changé ici
-                  mainAxisSize: MainAxisSize.min, // Ajouté
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
                       day['day'],
-                      style: const TextStyle(
-                        color: Colors.white70,
+                      style: TextStyle(
+                        color: Colors.grey.shade700,
                         fontSize: 14,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 4), // Réduit
-                    Text(
-                      day['icon'],
-                      style: const TextStyle(fontSize: 28), // Réduit
-                    ),
-                    const SizedBox(height: 4), // Réduit
+                    const SizedBox(height: 4),
+                    Text(day['icon'], style: const TextStyle(fontSize: 28)),
+                    const SizedBox(height: 4),
                     Text(
                       '${day['max']}°',
                       style: const TextStyle(
-                        color: Colors.white,
+                        color: Colors.teal,
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                     Text(
                       '${day['min']}°',
-                      style: const TextStyle(
-                        color: Colors.white54,
+                      style: TextStyle(
+                        color: Colors.grey.shade600,
                         fontSize: 14,
                       ),
                     ),

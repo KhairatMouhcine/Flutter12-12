@@ -61,6 +61,13 @@ class _HomePageState extends State<HomePage> {
             ),
             ListTile(
               leading: const Icon(Icons.home),
+              title: const Text('Emsi CHATBOT Rag'),
+              onTap: () {
+                Navigator.pushNamed(context, "/chatrag");
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.home),
               title: const Text('Meteo'),
               onTap: () {
                 Navigator.pushNamed(context, "/meteo");

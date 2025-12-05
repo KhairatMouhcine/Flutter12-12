@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:smater_app_ai/screens/ChatRag_part.dart';
 import 'package:smater_app_ai/screens/Chatbot_page.dart';
 import 'package:smater_app_ai/screens/MeteoPage.dart';
 import 'package:smater_app_ai/screens/callVideo_page.dart';
@@ -55,6 +56,7 @@ class MyApp extends StatelessWidget {
         '/chatbot': (context) => const ChatbotPage(),
         '/callVideo': (context) => const VideoCallScreen(),
         '/meteo': (context) => const MeteoPage(),
+        '/chatrag': (context) => const RAGChatPage(),
       },
     );
   }
