@@ -1,5 +1,5 @@
 import 'dart:io';
-import 'dart:convert';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
@@ -20,7 +20,7 @@ class _FruitClassifierState extends State<FruitClassifier> {
   bool _isLoading = false;
 
   Interpreter? _interpreter;
-  List<String>? _labels;
+  List<String> _labels = ['Apple', 'Banana', 'Grape', 'Mango', 'Strawberry'];
 
   @override
   void initState() {
@@ -31,24 +31,10 @@ class _FruitClassifierState extends State<FruitClassifier> {
   Future<void> _loadModel() async {
     try {
       _interpreter = await Interpreter.fromAsset(
-        'assets/models/fruit_classifier.tflite',
+        'assets/models/mobilenet_fruit_classifier.tflite',
       );
 
-      final labelsData = await rootBundle.loadString(
-        'assets/models/fruit_classes.json',
-      );
-      final Map<String, dynamic> jsonResult = json.decode(labelsData);
-
-      _labels = [];
-      jsonResult.forEach((key, value) {
-        int index = int.parse(key);
-        while (_labels!.length <= index) {
-          _labels!.add('');
-        }
-        _labels![index] = value;
-      });
-
-      print('✅ Modèle chargé avec ${_labels!.length} classes');
+      print('✅ Modèle MobileNet chargé avec ${_labels.length} classes');
       print('📋 Classes: $_labels');
 
       // Afficher les détails du modèle
@@ -104,7 +90,7 @@ class _FruitClassifierState extends State<FruitClassifier> {
   }
 
   Future<void> _classifyImage() async {
-    if (_image == null || _interpreter == null || _labels == null) {
+    if (_image == null || _interpreter == null) {
       return;
     }
 
@@ -120,23 +106,24 @@ class _FruitClassifierState extends State<FruitClassifier> {
         throw Exception('Impossible de décoder l\'image');
       }
 
-      // Redimensionner à 32x32
+      // Redimensionner à 224x224 (taille standard MobileNet)
       img.Image resizedImage = img.copyResize(
         originalImage,
-        width: 32,
-        height: 32,
+        width: 224,
+        height: 224,
       );
 
-      // Préparer l'input avec le bon format [1, 32, 32, 3]
+      // Préparer l'input avec le bon format [1, 224, 224, 3]
       var input = List.generate(1, (batch) {
-        return List.generate(32, (y) {
-          return List.generate(32, (x) {
+        return List.generate(224, (y) {
+          return List.generate(224, (x) {
             final pixel = resizedImage.getPixel(x, y);
-            // IMPORTANT: Normaliser entre 0 et 1 (division par 255)
+            // Normalisation MobileNet: (pixel / 127.5) - 1
+            // Résultat entre -1 et 1
             return [
-              pixel.r.toDouble() / 255.0,
-              pixel.g.toDouble() / 255.0,
-              pixel.b.toDouble() / 255.0,
+              (pixel.r.toDouble() / 127.5) - 1.0,
+              (pixel.g.toDouble() / 127.5) - 1.0,
+              (pixel.b.toDouble() / 127.5) - 1.0,
             ];
           });
         });
@@ -145,7 +132,7 @@ class _FruitClassifierState extends State<FruitClassifier> {
       // Préparer l'output [1, nombre_de_classes]
       var output = List.generate(
         1,
-        (_) => List<double>.filled(_labels!.length, 0.0),
+        (_) => List<double>.filled(_labels.length, 0.0),
       );
 
       print(
@@ -156,24 +143,36 @@ class _FruitClassifierState extends State<FruitClassifier> {
       // Faire la prédiction
       _interpreter!.run(input, output);
 
-      print('📊 Predictions: ${output[0]}');
+      print('📊 Raw predictions: ${output[0]}');
+
+      // Appliquer softmax pour obtenir des probabilités
+      List<double> probabilities = _softmax(output[0]);
+
+      print('📊 Softmax probabilities: $probabilities');
 
       // Trouver la classe avec la plus haute probabilité
-      double maxConfidence = output[0][0];
+      double maxConfidence = probabilities[0];
       int maxIndex = 0;
 
-      for (int i = 1; i < output[0].length; i++) {
-        if (output[0][i] > maxConfidence) {
-          maxConfidence = output[0][i];
+      for (int i = 1; i < probabilities.length; i++) {
+        if (probabilities[i] > maxConfidence) {
+          maxConfidence = probabilities[i];
           maxIndex = i;
         }
       }
 
-      print('✅ Classe prédite: ${_labels![maxIndex]} (index: $maxIndex)');
+      print('✅ Classe prédite: ${_labels[maxIndex]} (index: $maxIndex)');
       print('✅ Confiance: ${maxConfidence * 100}%');
 
+      // Afficher toutes les prédictions pour debug
+      for (int i = 0; i < _labels.length; i++) {
+        print(
+          '   ${_labels[i]}: ${(probabilities[i] * 100).toStringAsFixed(2)}%',
+        );
+      }
+
       setState(() {
-        _result = _labels![maxIndex];
+        _result = _labels[maxIndex];
         _confidence = maxConfidence * 100;
         _isLoading = false;
       });
@@ -184,6 +183,21 @@ class _FruitClassifierState extends State<FruitClassifier> {
       _showError('Erreur de classification: $e');
       print('❌ Erreur détaillée: $e');
     }
+  }
+
+  // Fonction softmax pour convertir les logits en probabilités
+  List<double> _softmax(List<double> logits) {
+    // Trouver le max pour la stabilité numérique
+    double maxLogit = logits.reduce((a, b) => a > b ? a : b);
+
+    // Calculer exp(x - max) pour chaque logit
+    List<double> expValues = logits.map((x) => math.exp(x - maxLogit)).toList();
+
+    // Calculer la somme
+    double sumExp = expValues.reduce((a, b) => a + b);
+
+    // Normaliser
+    return expValues.map((x) => x / sumExp).toList();
   }
 
   void _showError(String message) {
@@ -202,7 +216,7 @@ class _FruitClassifierState extends State<FruitClassifier> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Fruit Classifier'),
+        title: const Text('Fruit Classifier - MobileNet'),
         centerTitle: true,
         backgroundColor: Colors.teal,
         elevation: 0,

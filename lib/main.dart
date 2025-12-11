@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:smater_app_ai/screens/ChatRag_part.dart';
-import 'package:smater_app_ai/screens/Chatbot_page.dart';
+import 'package:smater_app_ai/screens/ollama_chat_screen.dart';
+import 'package:smater_app_ai/screens/Finetuning_page.dart';
 import 'package:smater_app_ai/screens/MeteoPage.dart';
 import 'package:smater_app_ai/screens/callVideo_page.dart';
 import 'package:smater_app_ai/screens/fruitClasifier_page.dart';
@@ -53,10 +53,10 @@ class MyApp extends StatelessWidget {
         '/register': (context) => const RegisterPage(),
         '/home': (context) => const HomePage(),
         '/fruitClasifier': (context) => const FruitClassifier(),
-        '/chatbot': (context) => const ChatbotPage(),
+        '/chatbot': (context) => const OllamaChatScreen(),
         '/callVideo': (context) => const VideoCallScreen(),
         '/meteo': (context) => const MeteoPage(),
-        '/chatrag': (context) => const RAGChatPage(),
+        '/finetuning': (context) => const RagChatScreen(),
       },
     );
   }

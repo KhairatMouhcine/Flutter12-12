@@ -46,6 +46,7 @@ dependencies:
   permission_handler: ^12.0.1
   syncfusion_flutter_pdf: ^31.2.18
   shared_preferences: ^2.5.4
+  file_picker: ^10.3.7
 
 dev_dependencies:
   flutter_test:
@@ -74,6 +75,7 @@ flutter:
     - assets/images/
     - assets/models/fruit_classifier.tflite
     - assets/models/fruit_classes.json
+    - assets/models/mobilenet_fruit_classifier.tflite
     - assets/videos/
     - assets/fichier/
   #   - images/a_dot_burr.jpeg
