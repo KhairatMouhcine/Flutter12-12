@@ -17,7 +17,6 @@ class _MeteoPageState extends State<MeteoPage> {
   WeatherData? _weatherData;
   String? _errorMessage;
 
-  // Configuration Ollama
   final String ollamaBaseUrl = 'http://10.0.2.2:11434';
   final String modelName = 'llama3.2:latest';
 
@@ -27,7 +26,6 @@ class _MeteoPageState extends State<MeteoPage> {
     _initializeLocation();
   }
 
-  // Récupérer l'IP et la localisation
   Future<void> _initializeLocation() async {
     setState(() {
       _isLoading = true;
@@ -41,26 +39,19 @@ class _MeteoPageState extends State<MeteoPage> {
       final ipData = json.decode(ipResponse.body);
       final ip = ipData['ip'];
 
-      // Détecter la localisation
       final locationCity = await _detectLocationWithOllama(ip);
-      setState(() {
-        _currentCity = locationCity;
-      });
+      setState(() => _currentCity = locationCity);
 
       await _fetchWeatherWithMCP(locationCity);
     } catch (e) {
-      setState(() {
-        _errorMessage = 'Erreur lors de la détection de localisation';
-      });
-      print('Erreur localisation: $e');
+      setState(
+        () => _errorMessage = 'Erreur lors de la détection de localisation',
+      );
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      setState(() => _isLoading = false);
     }
   }
 
-  // Détecter la localisation depuis l'IP
   Future<String> _detectLocationWithOllama(String ip) async {
     try {
       final locationResponse = await http.get(
@@ -70,31 +61,27 @@ class _MeteoPageState extends State<MeteoPage> {
       final city = locationData['city'];
       final country = locationData['country'];
 
-      setState(() {
-        _currentLocation = '$city, $country';
-      });
-
+      setState(() => _currentLocation = '$city, $country');
       return city;
     } catch (e) {
       return 'Paris';
     }
   }
 
-  // Définition du MCP Tool météo
   Map<String, dynamic> _getWeatherToolDefinition() {
     return {
       'type': 'function',
       'function': {
         'name': 'get_weather',
         'description':
-            'Récupère les informations météorologiques actuelles pour une ville. Comprend les surnoms: Casa=Casablanca, NYC=New York, LA=Los Angeles',
+            'Récupère les informations météorologiques actuelles pour une ville.',
         'parameters': {
           'type': 'object',
           'properties': {
             'city': {
               'type': 'string',
               'description':
-                  'Nom de la ville ou surnom (Paris, Casablanca, Casa, Maroc Casa, NYC)',
+                  'Nom de la ville ou surnom (Paris, Casablanca, Casa, NYC)',
             },
           },
           'required': ['city'],
@@ -103,7 +90,6 @@ class _MeteoPageState extends State<MeteoPage> {
     };
   }
 
-  // Normaliser les noms de villes avec Ollama
   Future<String> _normalizeCityName(String userInput) async {
     try {
       final response = await http.post(
@@ -116,13 +102,8 @@ class _MeteoPageState extends State<MeteoPage> {
               'role': 'system',
               'content':
                   '''Tu es un expert en géographie. Convertis les surnoms de villes en noms officiels.
-Exemples:
-- "Casa" ou "Maroc casa" → "Casablanca"
-- "NYC" → "New York"
-- "LA" → "Los Angeles"
-- "Rabat Maroc" → "Rabat"
-- "Paris France" → "Paris"
-Réponds UNIQUEMENT avec le nom de la ville, sans explication.''',
+Exemples: "Casa" → "Casablanca", "NYC" → "New York", "LA" → "Los Angeles"
+Réponds UNIQUEMENT avec le nom de la ville.''',
             },
             {'role': 'user', 'content': userInput},
           ],
@@ -132,18 +113,14 @@ Réponds UNIQUEMENT avec le nom de la ville, sans explication.''',
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        final cityName = data['message']['content'].trim();
-        print('🌍 Normalisation: "$userInput" → "$cityName"');
-        return cityName;
+        return data['message']['content'].trim();
       }
       return userInput;
     } catch (e) {
-      print('⚠️ Erreur normalisation: $e');
       return userInput;
     }
   }
 
-  // Récupérer la météo via l'API
   Future<Map<String, dynamic>> _fetchWeatherData(String city) async {
     try {
       final geoResponse = await http.get(
@@ -177,7 +154,6 @@ Réponds UNIQUEMENT avec le nom de la ville, sans explication.''',
     }
   }
 
-  // Utiliser Ollama avec MCP pour récupérer la météo
   Future<void> _fetchWeatherWithMCP(String city) async {
     setState(() {
       _isLoading = true;
@@ -185,10 +161,8 @@ Réponds UNIQUEMENT avec le nom de la ville, sans explication.''',
     });
 
     try {
-      // Étape 1: Normaliser le nom de la ville
       final normalizedCity = await _normalizeCityName(city);
 
-      // Étape 2: Appel à Ollama avec le tool météo
       final response = await http.post(
         Uri.parse('$ollamaBaseUrl/api/chat'),
         headers: {'Content-Type': 'application/json'},
@@ -197,10 +171,8 @@ Réponds UNIQUEMENT avec le nom de la ville, sans explication.''',
           'messages': [
             {
               'role': 'system',
-              'content': '''Tu es un assistant météo intelligent. 
-Utilise l'outil get_weather pour obtenir la météo.
-Comprends les surnoms: Casa=Casablanca, NYC=New York, LA=Los Angeles.
-Si l'utilisateur mentionne un pays avec une ville (ex: "Maroc casa"), extrait le nom de la ville.''',
+              'content':
+                  'Tu es un assistant météo intelligent. Utilise l\'outil get_weather pour obtenir la météo.',
             },
             {
               'role': 'user',
@@ -215,70 +187,41 @@ Si l'utilisateur mentionne un pays avec une ville (ex: "Maroc casa"), extrait le
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         final message = data['message'];
-        print('📡 Réponse Ollama: ${message.toString()}');
 
         String cityToFetch = normalizedCity;
 
-        // Vérifier si l'outil a été appelé
         if (message['tool_calls'] != null && message['tool_calls'].isNotEmpty) {
-          print('🔧 MCP Tool appelé par Ollama');
           try {
             final toolCall = message['tool_calls'][0];
-            final functionData = toolCall['function'];
-
-            // Gérer le cas où arguments est déjà un Map ou une String
-            dynamic argumentsData = functionData['arguments'];
-            Map<String, dynamic> arguments;
-
-            if (argumentsData is String) {
-              arguments = json.decode(argumentsData);
-            } else if (argumentsData is Map) {
-              arguments = Map<String, dynamic>.from(argumentsData);
-            } else {
-              arguments = {};
-            }
-
+            dynamic argumentsData = toolCall['function']['arguments'];
+            Map<String, dynamic> arguments = argumentsData is String
+                ? json.decode(argumentsData)
+                : Map<String, dynamic>.from(argumentsData);
             cityToFetch = arguments['city'] ?? normalizedCity;
-            print('📍 Ville demandée par le tool: $cityToFetch');
           } catch (e) {
-            print('⚠️ Erreur parsing tool call: $e');
             cityToFetch = normalizedCity;
           }
-        } else {
-          print('⚠️ Ollama n\'a pas appelé le tool, appel direct');
         }
 
-        // Exécuter l'outil météo
         final weatherData = await _fetchWeatherData(cityToFetch);
 
         if (weatherData.containsKey('error')) {
-          setState(() {
-            _errorMessage = weatherData['error'];
-          });
+          setState(() => _errorMessage = weatherData['error']);
         } else {
           final weather = WeatherData.fromJson(weatherData);
           setState(() {
             _weatherData = weather;
             _currentCity = weather.city;
           });
-          print('✅ Météo récupérée pour ${weather.city}');
         }
-      } else {
-        throw Exception('Erreur HTTP ${response.statusCode}: ${response.body}');
       }
     } catch (e) {
-      setState(() {
-        _errorMessage = 'Erreur de connexion: $e';
-      });
-      print('❌ Erreur: $e');
+      setState(() => _errorMessage = 'Erreur de connexion: $e');
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      setState(() => _isLoading = false);
     }
   }
 
-  // Rechercher une ville
   void _searchCity() {
     if (_cityController.text.trim().isNotEmpty) {
       _fetchWeatherWithMCP(_cityController.text.trim());
@@ -290,20 +233,30 @@ Si l'utilisateur mentionne un pays avec une ville (ex: "Maroc casa"), extrait le
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFF0a0e27),
       appBar: AppBar(
-        title: const Text('Météo'),
+        title: const Text(
+          '🌤️ Météo',
+          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+        ),
         centerTitle: true,
-        backgroundColor: Colors.teal,
+        backgroundColor: Colors.transparent,
         elevation: 0,
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFF667eea), Color(0xFF764ba2)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
+        iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: Container(
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [
-              Colors.teal.shade700,
-              Colors.teal.shade400,
-              Colors.teal.shade200,
-            ],
+            colors: [Color(0xFF0a0e27), Color(0xFF1a1f3a)],
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
           ),
@@ -311,22 +264,48 @@ Si l'utilisateur mentionne un pays avec une ville (ex: "Maroc casa"), extrait le
         child: SafeArea(
           child: Column(
             children: [
-              // Badge MCP Tool en haut
+              // Badge MCP Tool
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.all(8),
-                color: Colors.teal.shade50,
-                child: const Row(
+                padding: const EdgeInsets.symmetric(
+                  vertical: 10,
+                  horizontal: 16,
+                ),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      const Color(0xFF667eea).withOpacity(0.2),
+                      const Color(0xFF764ba2).withOpacity(0.2),
+                    ],
+                  ),
+                  border: Border(
+                    bottom: BorderSide(
+                      color: const Color(0xFF667eea).withOpacity(0.3),
+                    ),
+                  ),
+                ),
+                child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.build_circle, size: 16, color: Colors.teal),
-                    SizedBox(width: 8),
-                    Text(
-                      'Mode: MCP Tool',
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF667eea).withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.build_circle,
+                        size: 16,
+                        color: Color(0xFF667eea),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    const Text(
+                      'Mode: MCP Tool + Ollama',
                       style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.teal,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white70,
                       ),
                     ),
                   ],
@@ -354,65 +333,96 @@ Si l'utilisateur mentionne un pays avec une ville (ex: "Maroc casa"), extrait le
   Widget _buildHeader() {
     return Container(
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(color: Colors.white.withOpacity(0.1)),
       child: Column(
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Météo Intelligente',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  if (_currentLocation != null)
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.location_on,
-                          color: Colors.white,
-                          size: 16,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          _currentLocation!,
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
-                    ),
-                ],
-              ),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  Icons.wb_sunny,
-                  color: Colors.white,
-                  size: 28,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
+          // Titre et localisation
           Container(
+            padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(25),
+              gradient: const LinearGradient(
+                colors: [
+                  Color(0xFF667eea),
+                  Color(0xFF764ba2),
+                  Color(0xFFf093fb),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
+                  color: const Color(0xFF667eea).withOpacity(0.4),
+                  blurRadius: 20,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Météo Intelligente',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      if (_currentLocation != null) ...[
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.location_on,
+                              color: Colors.white70,
+                              size: 16,
+                            ),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                _currentLocation!,
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 14,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: const Text('🌍', style: TextStyle(fontSize: 32)),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 20),
+
+          // Barre de recherche
+          Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFF1a1f3a),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: const Color(0xFF667eea).withOpacity(0.3),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.2),
                   blurRadius: 10,
                   offset: const Offset(0, 4),
                 ),
@@ -420,14 +430,28 @@ Si l'utilisateur mentionne un pays avec une ville (ex: "Maroc casa"), extrait le
             ),
             child: TextField(
               controller: _cityController,
-              style: const TextStyle(color: Colors.black87),
+              style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
                 hintText: 'Rechercher une ville (Paris, Casa, NYC)...',
-                hintStyle: TextStyle(color: Colors.grey.shade500),
-                prefixIcon: const Icon(Icons.search, color: Colors.teal),
-                suffixIcon: IconButton(
-                  icon: const Icon(Icons.send, color: Colors.teal),
-                  onPressed: _searchCity,
+                hintStyle: TextStyle(color: Colors.grey[500]),
+                prefixIcon: const Icon(Icons.search, color: Color(0xFF667eea)),
+                suffixIcon: GestureDetector(
+                  onTap: _searchCity,
+                  child: Container(
+                    margin: const EdgeInsets.all(8),
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF667eea), Color(0xFF764ba2)],
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.send,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
                 ),
                 border: InputBorder.none,
                 contentPadding: const EdgeInsets.all(16),
@@ -446,20 +470,25 @@ Si l'utilisateur mentionne un pays avec une ville (ex: "Maroc casa"), extrait le
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(30),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
+              gradient: LinearGradient(
+                colors: [
+                  const Color(0xFF667eea).withOpacity(0.2),
+                  const Color(0xFF764ba2).withOpacity(0.2),
+                ],
+              ),
               shape: BoxShape.circle,
             ),
             child: const CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF667eea)),
               strokeWidth: 3,
             ),
           ),
           const SizedBox(height: 24),
-          const Text(
+          Text(
             'Chargement de la météo...',
-            style: TextStyle(color: Colors.white, fontSize: 16),
+            style: TextStyle(color: Colors.grey[400], fontSize: 16),
           ),
         ],
       ),
@@ -472,39 +501,27 @@ Si l'utilisateur mentionne un pays avec une ville (ex: "Maroc casa"), extrait le
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(30),
             decoration: BoxDecoration(
               color: Colors.red.withOpacity(0.2),
               shape: BoxShape.circle,
             ),
-            child: const Icon(
-              Icons.error_outline,
-              color: Colors.white,
-              size: 64,
-            ),
+            child: const Icon(Icons.error_outline, color: Colors.red, size: 60),
           ),
           const SizedBox(height: 24),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 40),
             child: Text(
               _errorMessage!,
-              style: const TextStyle(color: Colors.white, fontSize: 16),
+              style: TextStyle(color: Colors.grey[400], fontSize: 16),
               textAlign: TextAlign.center,
             ),
           ),
           const SizedBox(height: 24),
-          ElevatedButton.icon(
-            onPressed: () => _initializeLocation(),
-            icon: const Icon(Icons.refresh),
-            label: const Text('Réessayer'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.white,
-              foregroundColor: Colors.teal,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
+          _buildActionButton(
+            icon: Icons.refresh,
+            label: 'Réessayer',
+            onPressed: _initializeLocation,
           ),
         ],
       ),
@@ -517,16 +534,17 @@ Si l'utilisateur mentionne un pays avec une ville (ex: "Maroc casa"), extrait le
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
-            padding: const EdgeInsets.all(32),
+            padding: const EdgeInsets.all(40),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
+              gradient: LinearGradient(
+                colors: [
+                  const Color(0xFF667eea).withOpacity(0.2),
+                  const Color(0xFF764ba2).withOpacity(0.2),
+                ],
+              ),
               shape: BoxShape.circle,
             ),
-            child: const Icon(
-              Icons.cloud_outlined,
-              size: 80,
-              color: Colors.white,
-            ),
+            child: const Text('🌤️', style: TextStyle(fontSize: 80)),
           ),
           const SizedBox(height: 24),
           const Text(
@@ -538,9 +556,9 @@ Si l'utilisateur mentionne un pays avec une ville (ex: "Maroc casa"), extrait le
             ),
           ),
           const SizedBox(height: 12),
-          const Text(
+          Text(
             'Essayez: Paris, Casa, NYC, Tokyo...',
-            style: TextStyle(color: Colors.white70, fontSize: 16),
+            style: TextStyle(color: Colors.grey[500], fontSize: 16),
           ),
         ],
       ),
@@ -553,9 +571,9 @@ Si l'utilisateur mentionne un pays avec une ville (ex: "Maroc casa"), extrait le
       child: Column(
         children: [
           _buildMainWeatherCard(),
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
           _buildWeatherDetails(),
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
           _buildForecast(),
         ],
       ),
@@ -567,11 +585,16 @@ Si l'utilisateur mentionne un pays avec une ville (ex: "Maroc casa"), extrait le
       width: double.infinity,
       padding: const EdgeInsets.all(32),
       decoration: BoxDecoration(
-        color: Colors.white,
+        gradient: const LinearGradient(
+          colors: [Color(0xFF1a1f3a), Color(0xFF2d3561)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         borderRadius: BorderRadius.circular(32),
+        border: Border.all(color: const Color(0xFF667eea).withOpacity(0.3)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: const Color(0xFF667eea).withOpacity(0.2),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -582,30 +605,54 @@ Si l'utilisateur mentionne un pays avec une ville (ex: "Maroc casa"), extrait le
           Text(
             _weatherData!.city,
             style: const TextStyle(
-              color: Colors.teal,
-              fontSize: 32,
+              color: Colors.white,
+              fontSize: 28,
               fontWeight: FontWeight.bold,
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            _weatherData!.description,
-            style: TextStyle(color: Colors.grey.shade700, fontSize: 18),
-          ),
-          const SizedBox(height: 24),
-          Text(_weatherData!.icon, style: const TextStyle(fontSize: 120)),
-          const SizedBox(height: 24),
-          Text(
-            '${_weatherData!.temperature.toStringAsFixed(0)}°',
-            style: const TextStyle(
-              color: Colors.teal,
-              fontSize: 80,
-              fontWeight: FontWeight.w200,
+          const SizedBox(height: 4),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: const Color(0xFF667eea).withOpacity(0.3),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              _weatherData!.description,
+              style: const TextStyle(color: Colors.white70, fontSize: 14),
             ),
           ),
+          const SizedBox(height: 24),
+          Text(_weatherData!.icon, style: const TextStyle(fontSize: 100)),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '${_weatherData!.temperature.toStringAsFixed(0)}',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 80,
+                  fontWeight: FontWeight.w200,
+                ),
+              ),
+              const Padding(
+                padding: EdgeInsets.only(top: 16),
+                child: Text(
+                  '°C',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 28,
+                    fontWeight: FontWeight.w300,
+                  ),
+                ),
+              ),
+            ],
+          ),
           Text(
-            'Ressenti ${_weatherData!.feelsLike.toStringAsFixed(0)}°',
-            style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
+            'Ressenti ${_weatherData!.feelsLike.toStringAsFixed(0)}°C',
+            style: TextStyle(color: Colors.grey[500], fontSize: 16),
           ),
         ],
       ),
@@ -616,15 +663,9 @@ Si l'utilisateur mentionne un pays avec une ville (ex: "Maroc casa"), extrait le
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: const Color(0xFF1a1f3a),
         borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 15,
-            offset: const Offset(0, 5),
-          ),
-        ],
+        border: Border.all(color: const Color(0xFF667eea).withOpacity(0.2)),
       ),
       child: Column(
         children: [
@@ -632,25 +673,43 @@ Si l'utilisateur mentionne un pays avec une ville (ex: "Maroc casa"), extrait le
             Icons.water_drop,
             'Humidité',
             '${_weatherData!.humidity}%',
+            const Color(0xFF4facfe),
           ),
-          const Divider(color: Colors.grey, height: 32),
+          _buildDivider(),
           _buildDetailRow(
             Icons.air,
             'Vent',
             '${_weatherData!.windSpeed.toStringAsFixed(1)} km/h',
+            const Color(0xFF667eea),
           ),
-          const Divider(color: Colors.grey, height: 32),
+          _buildDivider(),
           _buildDetailRow(
             Icons.umbrella,
             'Précipitations',
             '${_weatherData!.precipitation.toStringAsFixed(1)} mm',
+            const Color(0xFFf093fb),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildDetailRow(IconData icon, String label, String value) {
+  Widget _buildDivider() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Divider(
+        color: const Color(0xFF667eea).withOpacity(0.2),
+        height: 1,
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(
+    IconData icon,
+    String label,
+    String value,
+    Color color,
+  ) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -659,24 +718,24 @@ Si l'utilisateur mentionne un pays avec une ville (ex: "Maroc casa"), extrait le
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: Colors.teal.shade50,
+                color: color.withOpacity(0.2),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(icon, color: Colors.teal, size: 24),
+              child: Icon(icon, color: color, size: 22),
             ),
             const SizedBox(width: 16),
             Text(
               label,
-              style: TextStyle(color: Colors.grey.shade700, fontSize: 16),
+              style: TextStyle(color: Colors.grey[400], fontSize: 16),
             ),
           ],
         ),
         Text(
           value,
-          style: const TextStyle(
-            color: Colors.teal,
+          style: TextStyle(
+            color: color,
             fontSize: 18,
-            fontWeight: FontWeight.w600,
+            fontWeight: FontWeight.bold,
           ),
         ),
       ],
@@ -687,67 +746,101 @@ Si l'utilisateur mentionne un pays avec une ville (ex: "Maroc casa"), extrait le
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Prévisions sur 5 jours',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-          ),
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF667eea).withOpacity(0.2),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(
+                Icons.calendar_today,
+                color: Color(0xFF667eea),
+                size: 18,
+              ),
+            ),
+            const SizedBox(width: 10),
+            const Text(
+              'Prévisions sur 5 jours',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 16),
         SizedBox(
-          height: 160,
+          height: 150,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             itemCount: _weatherData!.forecast.length,
             itemBuilder: (context, index) {
               final day = _weatherData!.forecast[index];
+              final isToday = index == 0;
               return Container(
-                width: 100,
+                width: 95,
                 margin: const EdgeInsets.only(right: 12),
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  gradient: isToday
+                      ? const LinearGradient(
+                          colors: [Color(0xFF667eea), Color(0xFF764ba2)],
+                        )
+                      : null,
+                  color: isToday ? null : const Color(0xFF1a1f3a),
                   borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
+                  border: Border.all(
+                    color: isToday
+                        ? Colors.transparent
+                        : const Color(0xFF667eea).withOpacity(0.2),
+                  ),
+                  boxShadow: isToday
+                      ? [
+                          BoxShadow(
+                            color: const Color(0xFF667eea).withOpacity(0.4),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ]
+                      : null,
                 ),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
                       day['day'],
                       style: TextStyle(
-                        color: Colors.grey.shade700,
-                        fontSize: 14,
+                        color: isToday ? Colors.white : Colors.grey[400],
+                        fontSize: 13,
+                        fontWeight: isToday
+                            ? FontWeight.bold
+                            : FontWeight.normal,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 4),
                     Text(day['icon'], style: const TextStyle(fontSize: 28)),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${day['max']}°',
-                      style: const TextStyle(
-                        color: Colors.teal,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    Text(
-                      '${day['min']}°',
-                      style: TextStyle(
-                        color: Colors.grey.shade600,
-                        fontSize: 14,
-                      ),
+                    Column(
+                      children: [
+                        Text(
+                          '${day['max']}°',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          '${day['min']}°',
+                          style: TextStyle(
+                            color: Colors.grey[500],
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -759,6 +852,47 @@ Si l'utilisateur mentionne un pays avec une ville (ex: "Maroc casa"), extrait le
     );
   }
 
+  Widget _buildActionButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onPressed,
+  }) {
+    return GestureDetector(
+      onTap: onPressed,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF667eea), Color(0xFF764ba2)],
+          ),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF667eea).withOpacity(0.4),
+              blurRadius: 12,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: Colors.white),
+            const SizedBox(width: 10),
+            Text(
+              label,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   void dispose() {
     _cityController.dispose();
@@ -766,7 +900,7 @@ Si l'utilisateur mentionne un pays avec une ville (ex: "Maroc casa"), extrait le
   }
 }
 
-// Modèles de données
+// Modèle de données (inchangé)
 class WeatherData {
   final String city;
   final double temperature;

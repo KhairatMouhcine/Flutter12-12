@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:tflite_flutter/tflite_flutter.dart';
 import 'package:image/image.dart' as img;
@@ -22,6 +21,15 @@ class _FruitClassifierState extends State<FruitClassifier> {
   Interpreter? _interpreter;
   List<String> _labels = ['Apple', 'Banana', 'Grape', 'Mango', 'Strawberry'];
 
+  // Emojis pour chaque fruit
+  final Map<String, String> _fruitEmojis = {
+    'Apple': '🍎',
+    'Banana': '🍌',
+    'Grape': '🍇',
+    'Mango': '🥭',
+    'Strawberry': '🍓',
+  };
+
   @override
   void initState() {
     super.initState();
@@ -33,13 +41,7 @@ class _FruitClassifierState extends State<FruitClassifier> {
       _interpreter = await Interpreter.fromAsset(
         'assets/models/mobilenet_fruit_classifier.tflite',
       );
-
       print('✅ Modèle MobileNet chargé avec ${_labels.length} classes');
-      print('📋 Classes: $_labels');
-
-      // Afficher les détails du modèle
-      print('📊 Input shape: ${_interpreter!.getInputTensor(0).shape}');
-      print('📊 Output shape: ${_interpreter!.getOutputTensor(0).shape}');
     } catch (e) {
       print('❌ Erreur chargement modèle: $e');
     }
@@ -90,13 +92,9 @@ class _FruitClassifierState extends State<FruitClassifier> {
   }
 
   Future<void> _classifyImage() async {
-    if (_image == null || _interpreter == null) {
-      return;
-    }
+    if (_image == null || _interpreter == null) return;
 
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
 
     try {
       final imageBytes = await _image!.readAsBytes();
@@ -106,20 +104,16 @@ class _FruitClassifierState extends State<FruitClassifier> {
         throw Exception('Impossible de décoder l\'image');
       }
 
-      // Redimensionner à 224x224 (taille standard MobileNet)
       img.Image resizedImage = img.copyResize(
         originalImage,
         width: 224,
         height: 224,
       );
 
-      // Préparer l'input avec le bon format [1, 224, 224, 3]
       var input = List.generate(1, (batch) {
         return List.generate(224, (y) {
           return List.generate(224, (x) {
             final pixel = resizedImage.getPixel(x, y);
-            // Normalisation MobileNet: (pixel / 127.5) - 1
-            // Résultat entre -1 et 1
             return [
               (pixel.r.toDouble() / 127.5) - 1.0,
               (pixel.g.toDouble() / 127.5) - 1.0,
@@ -129,28 +123,15 @@ class _FruitClassifierState extends State<FruitClassifier> {
         });
       });
 
-      // Préparer l'output [1, nombre_de_classes]
       var output = List.generate(
         1,
         (_) => List<double>.filled(_labels.length, 0.0),
       );
 
-      print(
-        '🔍 Input shape: ${input.length}x${input[0].length}x${input[0][0].length}x${input[0][0][0].length}',
-      );
-      print('🔍 Output shape: ${output.length}x${output[0].length}');
-
-      // Faire la prédiction
       _interpreter!.run(input, output);
 
-      print('📊 Raw predictions: ${output[0]}');
-
-      // Appliquer softmax pour obtenir des probabilités
       List<double> probabilities = _softmax(output[0]);
 
-      print('📊 Softmax probabilities: $probabilities');
-
-      // Trouver la classe avec la plus haute probabilité
       double maxConfidence = probabilities[0];
       int maxIndex = 0;
 
@@ -161,48 +142,32 @@ class _FruitClassifierState extends State<FruitClassifier> {
         }
       }
 
-      print('✅ Classe prédite: ${_labels[maxIndex]} (index: $maxIndex)');
-      print('✅ Confiance: ${maxConfidence * 100}%');
-
-      // Afficher toutes les prédictions pour debug
-      for (int i = 0; i < _labels.length; i++) {
-        print(
-          '   ${_labels[i]}: ${(probabilities[i] * 100).toStringAsFixed(2)}%',
-        );
-      }
-
       setState(() {
         _result = _labels[maxIndex];
         _confidence = maxConfidence * 100;
         _isLoading = false;
       });
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
+      setState(() => _isLoading = false);
       _showError('Erreur de classification: $e');
-      print('❌ Erreur détaillée: $e');
     }
   }
 
-  // Fonction softmax pour convertir les logits en probabilités
   List<double> _softmax(List<double> logits) {
-    // Trouver le max pour la stabilité numérique
     double maxLogit = logits.reduce((a, b) => a > b ? a : b);
-
-    // Calculer exp(x - max) pour chaque logit
     List<double> expValues = logits.map((x) => math.exp(x - maxLogit)).toList();
-
-    // Calculer la somme
     double sumExp = expValues.reduce((a, b) => a + b);
-
-    // Normaliser
     return expValues.map((x) => x / sumExp).toList();
   }
 
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.red),
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red[700],
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
     );
   }
 
@@ -215,159 +180,453 @@ class _FruitClassifierState extends State<FruitClassifier> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFF0a0e27),
       appBar: AppBar(
-        title: const Text('Fruit Classifier - MobileNet'),
+        title: const Text(
+          '🍎 Fruit Classifier',
+          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+        ),
         centerTitle: true,
-        backgroundColor: Colors.teal,
+        backgroundColor: Colors.transparent,
         elevation: 0,
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFF667eea), Color(0xFF764ba2)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
+        iconTheme: const IconThemeData(color: Colors.white),
       ),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Container(
-                height: 300,
-                decoration: BoxDecoration(
-                  color: Colors.grey[200],
-                  borderRadius: BorderRadius.circular(15),
-                  border: Border.all(color: Colors.teal, width: 2),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFF0a0e27), Color(0xFF1a1f3a)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+        ),
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Zone d'image
+                _buildImageContainer(),
+
+                const SizedBox(height: 24),
+
+                // Boutons
+                _buildActionButtons(),
+
+                const SizedBox(height: 24),
+
+                // Résultat
+                _buildResultCard(),
+
+                const SizedBox(height: 24),
+
+                // Liste des fruits supportés
+                _buildSupportedFruits(),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildImageContainer() {
+    return Container(
+      height: 300,
+      decoration: BoxDecoration(
+        color: const Color(0xFF1a1f3a),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: const Color(0xFF667eea).withOpacity(0.3),
+          width: 2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF667eea).withOpacity(0.2),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: _image == null
+          ? Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        const Color(0xFF667eea).withOpacity(0.2),
+                        const Color(0xFF764ba2).withOpacity(0.2),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Icon(
+                    Icons.image_search,
+                    size: 60,
+                    color: Color(0xFF667eea),
+                  ),
                 ),
-                child: _image == null
-                    ? Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.image_outlined,
-                            size: 80,
-                            color: Colors.grey[400],
-                          ),
-                          const SizedBox(height: 10),
-                          Text(
-                            'Aucune image sélectionnée',
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                        ],
-                      )
-                    : ClipRRect(
-                        borderRadius: BorderRadius.circular(15),
-                        child: Image.file(_image!, fit: BoxFit.cover),
-                      ),
-              ),
-
-              const SizedBox(height: 30),
-
-              Row(
+                const SizedBox(height: 16),
+                Text(
+                  'Aucune image sélectionnée',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.grey[400],
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Prenez une photo ou choisissez dans la galerie',
+                  style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                ),
+              ],
+            )
+          : ClipRRect(
+              borderRadius: BorderRadius.circular(22),
+              child: Stack(
+                fit: StackFit.expand,
                 children: [
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: _pickImageFromCamera,
-                      icon: const Icon(Icons.camera_alt),
-                      label: const Text('Caméra'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.teal,
-                        padding: const EdgeInsets.symmetric(vertical: 15),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
+                  Image.file(_image!, fit: BoxFit.cover),
+                  // Overlay gradient
+                  Positioned(
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    child: Container(
+                      height: 60,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            Colors.transparent,
+                            Colors.black.withOpacity(0.7),
+                          ],
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
                         ),
                       ),
                     ),
                   ),
-                  const SizedBox(width: 15),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: _pickImageFromGallery,
-                      icon: const Icon(Icons.photo_library),
-                      label: const Text('Galerie'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.teal,
-                        padding: const EdgeInsets.symmetric(vertical: 15),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
+                  // Indicateur de chargement
+                  if (_isLoading)
+                    Container(
+                      color: Colors.black.withOpacity(0.5),
+                      child: const Center(
+                        child: CircularProgressIndicator(
+                          color: Color(0xFF667eea),
                         ),
                       ),
                     ),
-                  ),
                 ],
               ),
+            ),
+    );
+  }
 
-              const SizedBox(height: 30),
+  Widget _buildActionButtons() {
+    return Row(
+      children: [
+        Expanded(
+          child: _buildGradientButton(
+            icon: Icons.camera_alt,
+            label: 'Caméra',
+            colors: [const Color(0xFF667eea), const Color(0xFF764ba2)],
+            onPressed: _pickImageFromCamera,
+          ),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: _buildGradientButton(
+            icon: Icons.photo_library,
+            label: 'Galerie',
+            colors: [const Color(0xFFf093fb), const Color(0xFFf5576c)],
+            onPressed: _pickImageFromGallery,
+          ),
+        ),
+      ],
+    );
+  }
 
+  Widget _buildGradientButton({
+    required IconData icon,
+    required String label,
+    required List<Color> colors,
+    required VoidCallback onPressed,
+  }) {
+    return GestureDetector(
+      onTap: onPressed,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(colors: colors),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: colors[0].withOpacity(0.4),
+              blurRadius: 12,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: Colors.white, size: 22),
+            const SizedBox(width: 10),
+            Text(
+              label,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildResultCard() {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1a1f3a),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: _result.isNotEmpty
+              ? const Color(0xFF4ade80).withOpacity(0.5)
+              : const Color(0xFF667eea).withOpacity(0.3),
+          width: 2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: _result.isNotEmpty
+                ? const Color(0xFF4ade80).withOpacity(0.2)
+                : const Color(0xFF667eea).withOpacity(0.1),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
               Container(
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.teal[50],
-                  borderRadius: BorderRadius.circular(15),
-                  border: Border.all(color: Colors.teal, width: 2),
+                  color: const Color(0xFF667eea).withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                child: Column(
-                  children: [
-                    const Text(
-                      'Résultat',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.teal,
-                      ),
-                    ),
-                    const SizedBox(height: 15),
-
-                    if (_isLoading)
-                      const CircularProgressIndicator()
-                    else if (_result.isEmpty)
-                      const Text(
-                        'Sélectionnez une image pour commencer',
-                        style: TextStyle(fontSize: 16, color: Colors.grey),
-                        textAlign: TextAlign.center,
-                      )
-                    else
-                      Column(
-                        children: [
-                          const Icon(
-                            Icons.check_circle,
-                            color: Colors.green,
-                            size: 50,
-                          ),
-                          const SizedBox(height: 10),
-                          Text(
-                            _result,
-                            style: const TextStyle(
-                              fontSize: 28,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.teal,
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 20,
-                              vertical: 8,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.teal,
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Text(
-                              'Confiance: ${_confidence.toStringAsFixed(1)}%',
-                              style: const TextStyle(
-                                fontSize: 16,
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                  ],
+                child: const Icon(
+                  Icons.analytics,
+                  color: Color(0xFF667eea),
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 10),
+              const Text(
+                'Résultat',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
                 ),
               ),
             ],
           ),
-        ),
+          const SizedBox(height: 20),
+
+          if (_isLoading)
+            Column(
+              children: [
+                const CircularProgressIndicator(color: Color(0xFF667eea)),
+                const SizedBox(height: 16),
+                Text(
+                  'Analyse en cours...',
+                  style: TextStyle(color: Colors.grey[400]),
+                ),
+              ],
+            )
+          else if (_result.isEmpty)
+            Column(
+              children: [
+                Icon(Icons.pending, size: 50, color: Colors.grey[600]),
+                const SizedBox(height: 12),
+                Text(
+                  'Sélectionnez une image pour commencer',
+                  style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            )
+          else
+            Column(
+              children: [
+                // Emoji du fruit
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        const Color(0xFF4ade80).withOpacity(0.2),
+                        const Color(0xFF22c55e).withOpacity(0.2),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    _fruitEmojis[_result] ?? '🍎',
+                    style: const TextStyle(fontSize: 60),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Nom du fruit
+                Text(
+                  _result,
+                  style: const TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Badge de confiance
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: _confidence >= 80
+                          ? [const Color(0xFF4ade80), const Color(0xFF22c55e)]
+                          : _confidence >= 50
+                          ? [const Color(0xFFfbbf24), const Color(0xFFf59e0b)]
+                          : [const Color(0xFFf87171), const Color(0xFFef4444)],
+                    ),
+                    borderRadius: BorderRadius.circular(30),
+                    boxShadow: [
+                      BoxShadow(
+                        color:
+                            (_confidence >= 80
+                                    ? const Color(0xFF4ade80)
+                                    : _confidence >= 50
+                                    ? const Color(0xFFfbbf24)
+                                    : const Color(0xFFf87171))
+                                .withOpacity(0.4),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        _confidence >= 80
+                            ? Icons.verified
+                            : _confidence >= 50
+                            ? Icons.help
+                            : Icons.warning,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Confiance: ${_confidence.toStringAsFixed(1)}%',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSupportedFruits() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1a1f3a),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFF667eea).withOpacity(0.2)),
+      ),
+      child: Column(
+        children: [
+          Text(
+            'Fruits supportés',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey[400],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: _labels.map((label) {
+              final isSelected = _result == label;
+              return Column(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? const Color(0xFF667eea).withOpacity(0.3)
+                          : const Color(0xFF0a0e27),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isSelected
+                            ? const Color(0xFF667eea)
+                            : Colors.transparent,
+                        width: 2,
+                      ),
+                    ),
+                    child: Text(
+                      _fruitEmojis[label] ?? '🍎',
+                      style: const TextStyle(fontSize: 28),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: isSelected ? Colors.white : Colors.grey[500],
+                      fontWeight: isSelected
+                          ? FontWeight.bold
+                          : FontWeight.normal,
+                    ),
+                  ),
+                ],
+              );
+            }).toList(),
+          ),
+        ],
       ),
     );
   }
