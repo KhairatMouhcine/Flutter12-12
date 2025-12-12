@@ -38,8 +38,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   final String ollamaUrl =
       'http://192.168.0.198:11434/api/generate'; // Pour émulateur Android
   // final String ollamaUrl = 'http://localhost:11434/api/generate'; // Pour iOS simulator
-  final String dIdApiKey =
-      'bm92YXRyaXhub3ZhQGdtYWlsLmNvbQ:C2A8tfRpXD540J3e8UezA';
+  final String dIdApiKey = 'xxxxxxxxxxxxx';
   final String dIdTalksUrl = 'https://api.d-id.com/talks';
   final String imageS3Url =
       's3://d-id-images-prod/google-oauth2|110635467151005719516/img_ACZTTgfnOoYya7PVE-F5C/1732555405028.jpg';
