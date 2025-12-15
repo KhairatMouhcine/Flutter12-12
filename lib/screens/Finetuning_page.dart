@@ -19,7 +19,7 @@ class _RagChatScreenState extends State<RagChatScreen> {
   String? _sessionId;
   int _uploadedFiles = 0;
 
-  final String _apiUrl = "http://100.112.11.220:5002";
+  final String _apiUrl = "http://10.40.14.69:5002";
 
   @override
   void initState() {
